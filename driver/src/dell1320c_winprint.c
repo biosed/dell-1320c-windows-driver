@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
             print_usage(argv[0]);
             return 0;
         } else if (strcmp(argv[i], "--version") == 0) {
-            printf("dell1320c_winprint v1.2.0 (%s)\n", ARCH_NAME);
+            printf("dell1320c_winprint v0.1.1 (%s)\n", ARCH_NAME);
             return 0;
         } else if (strcmp(argv[i], "-i") == 0 && i + 1 < argc) {
             input_file = argv[++i];

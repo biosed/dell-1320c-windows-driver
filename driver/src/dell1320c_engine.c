@@ -28,6 +28,20 @@
 
 #define UEL "\033%-12345X"
 
+#ifndef _WIN32
+/* Emit @HOAD with the host's real IPv4 address, or nothing if the lookup
+ * fails (mirrors the CUPS FXM_HBPL behavior - never fabricate one). */
+static void write_hoad(FILE *out, const char *hostname) {
+    struct hostent *he = gethostbyname(hostname);
+    if (he && he->h_addrtype == AF_INET &&
+        he->h_addr_list && he->h_addr_list[0]) {
+        const unsigned char *a = (const unsigned char *)he->h_addr_list[0];
+        fprintf(out, "@PJL SET JOBATTR=\"@HOAD=%02X%02X%02X%02X\"\n",
+                a[0], a[1], a[2], a[3]);
+    }
+}
+#endif
+
 /* Helper to write 32-bit little-endian integer */
 static void write_le32(unsigned char *buf, uint32_t val) {
     buf[0] = (unsigned char)(val & 0xFF);
@@ -190,7 +204,12 @@ void dell1320c_write_job_header(FILE *out, const DellJobConfig *cfg) {
     fprintf(out, "@PJL SET JOBATTR=\"@LUNA=%s\"\n", cfg->user[0] ? cfg->user : "WindowsUser");
     fprintf(out, "@PJL SET JOBATTR=\"@JOAU=%s\"\n", cfg->user[0] ? cfg->user : "WindowsUser");
     fprintf(out, "@PJL SET JOBATTR=\"@CNAM=%s\"\n", hostname);
-    fprintf(out, "@PJL SET JOBATTR=\"@HOAD=7F000001\"\n");
+#ifndef _WIN32
+    write_hoad(out, hostname);
+#else
+    /* No fabricated @HOAD on Windows (hostname resolution needs Winsock
+     * init here); the field is informational and safely omitted. */
+#endif
     fprintf(out, "@PJL SET JOBATTR=\"@NLPP=1\"\n");
     fprintf(out, "@PJL SET COPIES=%d\n", cfg->copies > 0 ? cfg->copies : 1);
     fprintf(out, "@PJL SET RENDERMODE=%s\n", cfg->color_mode == DELL1320C_MODE_COLOR ? "COLOR" : "BLACK");
@@ -233,8 +252,8 @@ void dell1320c_write_job_header(FILE *out, const DellJobConfig *cfg) {
 }
 
 void dell1320c_write_job_trailer(FILE *out) {
-    /* Document end: "B" + UEL + "@PJL EOJ\n\033%-12345X" */
-    fprintf(out, "B%s@PJL EOJ\n%s", UEL, UEL);
+    /* Document end: "B" + UEL + "@PJL EOJ\n" (matches vendor framing). */
+    fprintf(out, "B%s@PJL EOJ\n", UEL);
     fflush(out);
 }
 
@@ -252,10 +271,19 @@ int dell1320c_write_page_rgb(FILE *out, const uint8_t *rgb_data, int width_px, i
         return -1;
     }
 
-    /* Map paper code */
-    uint32_t w_pt = cfg ? cfg->width_pt : 612;
-    uint32_t h_pt = cfg ? cfg->height_pt : 792;
-    int pc = (cfg && cfg->paper != DELL1320C_PAPER_CUSTOM) ? cfg->paper : dell1320c_paper_code(w_pt, h_pt);
+    /* Map paper code.
+     * NOTE: the mapping runs on RASTER PIXEL dims, not points - that is what
+     * the vendor firmware receives (verified byte-identical against the
+     * vendor filter chain). Pixel dims match no named size, so this yields
+     * the default (Letter) exactly like the reference chain. The --paper
+     * CLI hint is intentionally NOT used here: the working vendor driver
+     * emits the default code for these jobs and the printer accepts it. */
+    uint32_t w_px = (uint32_t)width_px;
+    uint32_t h_px = (uint32_t)height_px;
+    /* Header width is 8px-aligned, matching the vendor FXM_ALC output
+     * header (the encoded stream itself uses the true width). */
+    uint32_t w_hdr = (w_px + 7u) & ~7u;
+    int pc = dell1320c_paper_code(w_px, h_px);
     int slot = cfg ? cfg->tray : DELL1320C_TRAY_1;
 
     /* Build 78-byte Page Header */
@@ -289,8 +317,8 @@ int dell1320c_write_page_rgb(FILE *out, const uint8_t *rgb_data, int width_px, i
     ph[off++] = 0x99; ph[off++] = 0xa4;
     write_le32(&ph[off], (uint32_t)page_num); off += 4; /* page number */
     ph[off++] = 0x9a; ph[off++] = 0xc4;
-    write_le32(&ph[off], w_pt); off += 4;       /* width */
-    write_le32(&ph[off], h_pt); off += 4;       /* height */
+    write_le32(&ph[off], w_hdr); off += 4;       /* width, pixels, 8-aligned */
+    write_le32(&ph[off], h_px); off += 4;        /* height, pixels */
     ph[off++] = 0x9b; ph[off++] = 0xa1;
     ph[off++] = 0x00;
     ph[off++] = 0x9c; ph[off++] = 0xa1;
@@ -306,8 +334,8 @@ int dell1320c_write_page_rgb(FILE *out, const uint8_t *rgb_data, int width_px, i
     ph[off++] = 0xa1; ph[off++] = 0xa1;
     ph[off++] = 0x00;
     ph[off++] = 0xa2; ph[off++] = 0xc4;
-    write_le32(&ph[off], w_pt); off += 4;       /* width again */
-    write_le32(&ph[off], h_pt); off += 4;       /* height again */
+    write_le32(&ph[off], w_hdr); off += 4;       /* width again */
+    write_le32(&ph[off], h_px); off += 4;        /* height again */
 
     fwrite(ph, 1, (size_t)off, out);
 
@@ -353,9 +381,10 @@ int dell1320c_write_page_mono(FILE *out, const uint8_t *mono_data, int line_size
         return -1;
     }
 
-    uint32_t w_pt = cfg ? cfg->width_pt : 612;
-    uint32_t h_pt = cfg ? cfg->height_pt : 792;
-    int pc = (cfg && cfg->paper != DELL1320C_PAPER_CUSTOM) ? cfg->paper : dell1320c_paper_code(w_pt, h_pt);
+    uint32_t w_px = (uint32_t)line_size;
+    uint32_t h_px = (uint32_t)height_px;
+    uint32_t w_hdr = (w_px + 7u) & ~7u; /* 8px-aligned header, like FXM_ALC */
+    int pc = dell1320c_paper_code(w_px, h_px); /* pixel dims, like write_page_rgb */
     int slot = cfg ? cfg->tray : DELL1320C_TRAY_1;
 
     unsigned char ph[78];
@@ -388,8 +417,8 @@ int dell1320c_write_page_mono(FILE *out, const uint8_t *mono_data, int line_size
     ph[off++] = 0x99; ph[off++] = 0xa4;
     write_le32(&ph[off], (uint32_t)page_num); off += 4;
     ph[off++] = 0x9a; ph[off++] = 0xc4;
-    write_le32(&ph[off], w_pt); off += 4;
-    write_le32(&ph[off], h_pt); off += 4;
+    write_le32(&ph[off], w_hdr); off += 4;       /* width, pixels, 8-aligned */
+    write_le32(&ph[off], h_px); off += 4;        /* height, pixels */
     ph[off++] = 0x9b; ph[off++] = 0xa1;
     ph[off++] = 0x00;
     ph[off++] = 0x9c; ph[off++] = 0xa1;
@@ -405,8 +434,8 @@ int dell1320c_write_page_mono(FILE *out, const uint8_t *mono_data, int line_size
     ph[off++] = 0xa1; ph[off++] = 0xa1;
     ph[off++] = 0x00;
     ph[off++] = 0xa2; ph[off++] = 0xc4;
-    write_le32(&ph[off], w_pt); off += 4;
-    write_le32(&ph[off], h_pt); off += 4;
+    write_le32(&ph[off], w_hdr); off += 4;
+    write_le32(&ph[off], h_px); off += 4;
 
     fwrite(ph, 1, (size_t)off, out);
 
