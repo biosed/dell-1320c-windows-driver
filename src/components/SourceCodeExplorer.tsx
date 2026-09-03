@@ -3,6 +3,7 @@ import { FileCode, Copy, Check, ExternalLink, Terminal, Cpu } from "lucide-react
 
 export const SourceCodeExplorer: React.FC = () => {
   const files = [
+    { name: "README.md", path: "README.md", type: "GitHub Docs", desc: "Comprehensive documentation, setup instructions & CLI manual" },
     { name: "dell1320c_engine.h", path: "driver/src/dell1320c_engine.h", type: "C Header", desc: "Core HBPL v2 structures, 78-byte page header, SQ21 signatures" },
     { name: "dell1320c_engine.c", path: "driver/src/dell1320c_engine.c", type: "C Source", desc: "PJL builder, raster chunking, band streamer, and test page generator" },
     { name: "dell1320c_winprint.c", path: "driver/src/dell1320c_winprint.c", type: "C Windows Entry", desc: "Win32/Win64/ARM64 Winsock dispatcher, spooler pipeline, and USB handler" },

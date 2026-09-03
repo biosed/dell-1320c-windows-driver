@@ -2,5 +2,7 @@
   "name": "Dell 1320c Windows Universal Driver",
   "description": "Windows 32-bit (x86), 64-bit (x64), and ARM/ARM64 driver suite and print processor for the Dell 1320c color laser printer, ported from biosed/dell-1320c-cups-driver.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

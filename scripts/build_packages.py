@@ -24,6 +24,8 @@ with zipfile.ZipFile(universal_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
     add_folder_to_zip(zf, os.path.join(DRIVER_DIR, "scripts"), "scripts")
     add_folder_to_zip(zf, os.path.join(DRIVER_DIR, "src"), "src")
     zf.write(os.path.join(DRIVER_DIR, "README.txt"), "README.txt")
+    if os.path.exists(os.path.join(ROOT, "README.md")):
+        zf.write(os.path.join(ROOT, "README.md"), "README.md")
 
 # 2. ARM64 Package
 arm64_zip_path = os.path.join(OUT_DIR, "dell1320c-windows-driver-arm64.zip")
