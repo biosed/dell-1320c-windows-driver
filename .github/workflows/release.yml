@@ -1,0 +1,144 @@
+name: Build & Release Dell 1320c Windows Driver
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag Name (e.g. v1.2.0)'
+        required: false
+        default: 'v1.2.0'
+      draft:
+        description: 'Publish as a Draft Release?'
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark as a Pre-release?'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build Multi-Arch Drivers & Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install MinGW Cross-Compilers (x86 & x64)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 gcc-mingw-w64-i686
+
+      - name: Install LLVM-MinGW for Windows ARM64
+        run: |
+          echo "Downloading LLVM-MinGW for native Windows ARM64 (AArch64)..."
+          curl -fsSL -o /tmp/llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20240917/llvm-mingw-20240917-ucrt-ubuntu-22.04-x86_64.tar.xz
+          sudo tar -xJf /tmp/llvm-mingw.tar.xz -C /opt
+          sudo mv /opt/llvm-mingw-20240917-ucrt-ubuntu-22.04-x86_64 /opt/llvm-mingw
+          echo "/opt/llvm-mingw/bin" >> $GITHUB_PATH
+
+      - name: Verify Cross-Compiler Toolchains
+        run: |
+          i686-w64-mingw32-gcc --version | head -n 1
+          x86_64-w64-mingw32-gcc --version | head -n 1
+          /opt/llvm-mingw/bin/aarch64-w64-mingw32-gcc --version | head -n 1
+
+      - name: Compile Native Binaries for x86, x64, ARM64, and Host
+        run: |
+          make -C driver/src clean
+          make -C driver/src all CC_ARM64=/opt/llvm-mingw/bin/aarch64-w64-mingw32-gcc
+
+      - name: Verify Binary PE Headers & Architectures
+        run: |
+          echo "Inspecting compiled Windows binaries..."
+          file driver/bin/x86/dell1320c_winprint.exe
+          file driver/bin/x64/dell1320c_winprint.exe
+          file driver/bin/arm64/dell1320c_winprint.exe
+
+      - name: Build Driver Distribution ZIP Archives
+        run: |
+          python3 scripts/build_packages.py
+
+      - name: Generate Checksums (SHA-256)
+        id: checksums
+        run: |
+          cd public/downloads
+          sha256sum dell1320c-windows-driver-*.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "SHA256_CONTENTS<<EOF" >> $GITHUB_ENV
+          cat SHA256SUMS.txt >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Determine Release Tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate Release Notes Body
+        id: notes
+        run: |
+          cat << 'EOF' > /tmp/release_notes.md
+          ## 🖨️ Dell Color Laser 1320c Windows Driver Suite
+
+          Universal Windows Driver Suite providing full native support for **Windows 11 / 10 ARM64** (Snapdragon X Elite, Surface Pro X, Surface Laptop 7, Parallels VMs), **Windows 64-bit (x64)**, and **Windows 32-bit (x86)**.
+
+          Ported from the open-source Linux driver by [biosed/dell-1320c-cups-driver](https://github.com/biosed/dell-1320c-cups-driver).
+
+          ---
+
+          ### 📦 Included Packages:
+          - **`dell1320c-windows-driver-universal.zip`** *(Recommended)*: Complete package with native binaries for all architectures (x86, x64, ARM64), INF/GPD/PPD setup, automated PowerShell and batch installers, and complete C source code.
+          - **`dell1320c-windows-driver-arm64.zip`**: Lightweight standalone package optimized for Windows on ARM64.
+          - **`dell1320c-windows-driver-x64.zip`**: Standalone package for 64-bit Windows 11/10/7.
+          - **`dell1320c-windows-driver-x86.zip`**: Standalone package for 32-bit Windows systems.
+
+          ---
+
+          ### 🚀 Quick Start Installation:
+          1. Extract the ZIP archive.
+          2. Right-click `scripts\install.bat` and select **Run as Administrator** (or run PowerShell):
+             ```powershell
+             .\scripts\Install-Dell1320c-Driver.ps1 -ConnectionType Network -PrinterIP 192.168.1.100 -TestPrint
+             ```
+
+          ---
+
+          ### 🔒 Integrity Checksums (SHA-256):
+          ```
+          EOF
+          cat public/downloads/SHA256SUMS.txt >> /tmp/release_notes.md
+          echo '```' >> /tmp/release_notes.md
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.TAG }}
+          name: "Dell 1320c Windows Universal Driver ${{ steps.tag.outputs.TAG }}"
+          body_path: /tmp/release_notes.md
+          draft: ${{ github.event.inputs.draft || false }}
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          files: |
+            public/downloads/dell1320c-windows-driver-universal.zip
+            public/downloads/dell1320c-windows-driver-arm64.zip
+            public/downloads/dell1320c-windows-driver-x64.zip
+            public/downloads/dell1320c-windows-driver-x86.zip
+            public/downloads/SHA256SUMS.txt

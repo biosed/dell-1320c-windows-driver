@@ -221,6 +221,42 @@ Every print stream sent to the Dell 1320c adheres to the following sequence:
 
 ---
 
+## 🚢 Automated GitHub Actions Build & Release
+
+This repository includes automated GitHub Actions workflows (`.github/workflows/release.yml` and `.github/workflows/ci.yml`) to automatically compile the Windows driver binaries on GitHub's cloud runners and publish official GitHub Releases with attached artifacts.
+
+### Creating a Release via Git Tag
+
+Pushing any tag starting with `v` (e.g., `v1.2.0`) triggers the automated release build:
+
+```bash
+# Tag the current commit
+git tag v1.2.0
+
+# Push the tag to GitHub
+git push origin v1.2.0
+```
+
+### Creating a Release via the GitHub Web Interface
+
+1. Navigate to your repository on GitHub.
+2. Click the **Actions** tab.
+3. Select **Build & Release Dell 1320c Windows Driver** from the left sidebar.
+4. Click **Run workflow**, enter the version tag (e.g. `v1.2.0`), and click the green **Run workflow** button.
+
+### What the Release Workflow Does:
+- Sets up an Ubuntu build environment with `gcc-mingw-w64` and `llvm-mingw`.
+- Cross-compiles clean native binaries for **x86**, **x64**, and **ARM64**.
+- Packages the distribution archives:
+  - `dell1320c-windows-driver-universal.zip`
+  - `dell1320c-windows-driver-arm64.zip`
+  - `dell1320c-windows-driver-x64.zip`
+  - `dell1320c-windows-driver-x86.zip`
+- Generates `SHA256SUMS.txt` for integrity verification.
+- Automatically creates the GitHub Release, attaches all ZIP files and checksums, and formats the release notes.
+
+---
+
 ## 📄 License & Acknowledgments
 
 - **Upstream CUPS Driver**: Reverse-engineered and implemented for Linux CUPS by **biosed** ([biosed/dell-1320c-cups-driver](https://github.com/biosed/dell-1320c-cups-driver)).

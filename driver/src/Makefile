@@ -3,7 +3,7 @@
 
 CC_X86   ?= i686-w64-mingw32-gcc
 CC_X64   ?= x86_64-w64-mingw32-gcc
-CC_ARM64 ?= /opt/llvm-mingw/bin/aarch64-w64-mingw32-gcc
+CC_ARM64 ?= $(shell command -v aarch64-w64-mingw32-gcc 2>/dev/null || command -v /opt/llvm-mingw/bin/aarch64-w64-mingw32-gcc 2>/dev/null || echo aarch64-w64-mingw32-gcc)
 CC_HOST  ?= gcc
 
 CFLAGS   = -O2 -Wall -Wextra -I.
