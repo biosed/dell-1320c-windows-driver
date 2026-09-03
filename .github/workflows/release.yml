@@ -46,9 +46,12 @@ jobs:
       - name: Install LLVM-MinGW for Windows ARM64
         run: |
           echo "Downloading LLVM-MinGW for native Windows ARM64 (AArch64)..."
-          curl -fsSL -o /tmp/llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20240917/llvm-mingw-20240917-ucrt-ubuntu-22.04-x86_64.tar.xz
+          # Asset names use ubuntu-20.04 (there is no 22.04 build upstream).
+          curl -fsSL -o /tmp/llvm-mingw.tar.xz https://github.com/mstorsjo/llvm-mingw/releases/download/20240917/llvm-mingw-20240917-ucrt-ubuntu-20.04-x86_64.tar.xz
           sudo tar -xJf /tmp/llvm-mingw.tar.xz -C /opt
-          sudo mv /opt/llvm-mingw-20240917-ucrt-ubuntu-22.04-x86_64 /opt/llvm-mingw
+          # Derive the top-level dir instead of hardcoding it.
+          LLVM_DIR="$(tar -tf /tmp/llvm-mingw.tar.xz | head -1 | cut -d/ -f1)"
+          sudo mv "/opt/$LLVM_DIR" /opt/llvm-mingw
           echo "/opt/llvm-mingw/bin" >> $GITHUB_PATH
 
       - name: Verify Cross-Compiler Toolchains
