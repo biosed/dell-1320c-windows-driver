@@ -1,0 +1,66 @@
+;
+; dell1320c.inf
+; Windows Printer Driver Setup Information File for Dell Color Laser 1320c
+; Supports Windows x86 (32-bit), Windows x64 (AMD64 / Intel 64), Windows ARM, and Windows ARM64
+;
+
+[Version]
+Signature="$Windows NT$"
+Class=Printer
+ClassGUID={4D36E979-E325-11CE-BFC1-08002BE10318}
+Provider=%ManufacturerName%
+CatalogFile=dell1320c.cat
+DriverVer=09/03/2026,1.2.0.0
+
+[Manufacturer]
+%ManufacturerName%=Dell,NTx86,NTamd64,NTarm,NTarm64
+
+; Windows 32-bit (x86)
+[Dell.NTx86]
+"Dell Color Laser 1320c" = DELL1320C_INSTALL, USBPRINT\DellColor_Laser_13200EB3, WSDPRINT\DellColor_Laser_13200EB3, USB\VID_413C&PID_5127, 1320c_RAW_PORT
+
+; Windows 64-bit (x64 / AMD64)
+[Dell.NTamd64]
+"Dell Color Laser 1320c" = DELL1320C_INSTALL, USBPRINT\DellColor_Laser_13200EB3, WSDPRINT\DellColor_Laser_13200EB3, USB\VID_413C&PID_5127, 1320c_RAW_PORT
+
+; Windows ARM (32-bit)
+[Dell.NTarm]
+"Dell Color Laser 1320c" = DELL1320C_INSTALL, USBPRINT\DellColor_Laser_13200EB3, WSDPRINT\DellColor_Laser_13200EB3, USB\VID_413C&PID_5127, 1320c_RAW_PORT
+
+; Windows ARM64 (Snapdragon X Elite, Surface Pro X, Parallels, etc.)
+[Dell.NTarm64]
+"Dell Color Laser 1320c" = DELL1320C_INSTALL, USBPRINT\DellColor_Laser_13200EB3, WSDPRINT\DellColor_Laser_13200EB3, USB\VID_413C&PID_5127, 1320c_RAW_PORT
+
+[DELL1320C_INSTALL]
+CopyFiles=@dell1320c.gpd,@dell1320c.ppd,FILTER_FILES
+DataSection=UNIDRV_DATA
+DataFile=dell1320c.gpd
+Include=NTPRINT.INF
+Needs=UNIDRV.OEM,UNIDRV_DATA
+
+[FILTER_FILES]
+dell1320c_winprint.exe
+dell1320c_filter.exe
+
+[DestinationDirs]
+DefaultDestDir=66000
+FILTER_FILES=66000
+
+[SourceDisksNames.x86]
+1 = %DiskName%,,,\bin\x86
+
+[SourceDisksNames.amd64]
+1 = %DiskName%,,,\bin\x64
+
+[SourceDisksNames.arm64]
+1 = %DiskName%,,,\bin\arm64
+
+[SourceDisksFiles]
+dell1320c.gpd = 1,..\common
+dell1320c.ppd = 1,..\common
+dell1320c_winprint.exe = 1
+dell1320c_filter.exe   = 1
+
+[Strings]
+ManufacturerName="Dell Inc."
+DiskName="Dell 1320c Driver Installation Media"

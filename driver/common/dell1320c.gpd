@@ -1,0 +1,200 @@
+*GPDSpecVersion: "1.0"
+*GPDFileName: "dell1320c.gpd"
+*Include: "StdNames.gpd"
+*ModelName: "Dell Color Laser 1320c"
+*MasterUnits: PAIR(600, 600)
+*ResourceDLL: "unires.dll"
+*PrinterType: PAGE
+*MaxCopies: 999
+
+*% ---- Features & Options ----
+
+*% Paper Sizes
+*Feature: PaperSize
+{
+    *rcNameID: =PAPER_SIZE_DISPLAY
+    *DefaultOption: LETTER
+
+    *Option: LETTER
+    {
+        *rcNameID: =RC_LETTER
+        *PrintableArea: PAIR(4896, 6396)
+        *PrintableOrigin: PAIR(102, 102)
+        *Command: CmdSelect
+        {
+            *Order: DOC_SETUP.20
+            *Cmd: "<1B>&l2a8c1E"
+        }
+    }
+    *Option: A4
+    {
+        *rcNameID: =RC_A4
+        *PrintableArea: PAIR(4760, 6814)
+        *PrintableOrigin: PAIR(100, 100)
+        *Command: CmdSelect
+        {
+            *Order: DOC_SETUP.20
+            *Cmd: "<1B>&l26a8c1E"
+        }
+    }
+    *Option: LEGAL
+    {
+        *rcNameID: =RC_LEGAL
+        *PrintableArea: PAIR(4896, 8196)
+        *PrintableOrigin: PAIR(102, 102)
+        *Command: CmdSelect
+        {
+            *Order: DOC_SETUP.20
+            *Cmd: "<1B>&l3a8c1E"
+        }
+    }
+    *Option: EXECUTIVE
+    {
+        *rcNameID: =RC_EXECUTIVE
+        *PrintableArea: PAIR(4150, 6100)
+        *PrintableOrigin: PAIR(100, 100)
+    }
+    *Option: B5
+    {
+        *rcNameID: =RC_B5
+        *PrintableArea: PAIR(4100, 5876)
+        *PrintableOrigin: PAIR(100, 100)
+    }
+    *Option: ENV_10
+    {
+        *rcNameID: =RC_ENV_10
+        *PrintableArea: PAIR(2276, 5500)
+        *PrintableOrigin: PAIR(100, 100)
+    }
+    *Option: ENV_DL
+    {
+        *rcNameID: =RC_ENV_DL
+        *PrintableArea: PAIR(2400, 5000)
+        *PrintableOrigin: PAIR(100, 100)
+    }
+    *Option: ENV_C5
+    {
+        *rcNameID: =RC_ENV_C5
+        *PrintableArea: PAIR(3624, 5208)
+        *PrintableOrigin: PAIR(100, 100)
+    }
+    *Option: ENV_MONARCH
+    {
+        *rcNameID: =RC_ENV_MONARCH
+        *PrintableArea: PAIR(2124, 4300)
+        *PrintableOrigin: PAIR(100, 100)
+    }
+}
+
+*% Input Bins / Trays
+*Feature: InputBin
+{
+    *rcNameID: =INPUT_BIN_DISPLAY
+    *DefaultOption: TRAY1
+
+    *Option: AUTO
+    {
+        *rcNameID: =AUTO_DISPLAY
+    }
+    *Option: TRAY1
+    {
+        *rcNameID: =TRAY1_DISPLAY
+    }
+    *Option: TRAY2
+    {
+        *rcNameID: =TRAY2_DISPLAY
+    }
+    *Option: MANUAL
+    {
+        *rcNameID: =MANUAL_FEED_DISPLAY
+    }
+}
+
+*% Resolution
+*Feature: Resolution
+{
+    *rcNameID: =RESOLUTION_DISPLAY
+    *DefaultOption: 600dpi
+
+    *Option: 600dpi
+    {
+        *Name: "600 x 600 dpi"
+        *DPI: PAIR(600, 600)
+        *TextDPI: PAIR(600, 600)
+        *SpotDiameter: 100
+        *Command: CmdSelect
+        {
+            *Order: DOC_SETUP.10
+            *Cmd: "@PJL SET RESOLUTION=600<0A>"
+        }
+    }
+    *Option: 300dpi
+    {
+        *Name: "300 x 300 dpi"
+        *DPI: PAIR(300, 300)
+        *TextDPI: PAIR(300, 300)
+        *SpotDiameter: 100
+        *Command: CmdSelect
+        {
+            *Order: DOC_SETUP.10
+            *Cmd: "@PJL SET RESOLUTION=300<0A>"
+        }
+    }
+}
+
+*% Color Mode
+*Feature: ColorMode
+{
+    *rcNameID: =COLOR_PRINTING_MODE_DISPLAY
+    *DefaultOption: 24bpp
+
+    *Option: Mono
+    {
+        *rcNameID: =MONO_DISPLAY
+        *DevNumOfPlanes: 1
+        *DevBPP: 8
+        *Color?: FALSE
+        *Command: CmdSelect
+        {
+            *Order: DOC_SETUP.15
+            *Cmd: "@PJL SET RENDERMODE=BLACK<0A>"
+        }
+    }
+    *Option: 24bpp
+    {
+        *rcNameID: =24BPP_DISPLAY
+        *DevNumOfPlanes: 3
+        *DevBPP: 24
+        *DrvBPP: 24
+        *Color?: TRUE
+        *Command: CmdSelect
+        {
+            *Order: DOC_SETUP.15
+            *Cmd: "@PJL SET RENDERMODE=COLOR<0A>"
+        }
+    }
+}
+
+*% Halftone
+*Feature: Halftone
+{
+    *rcNameID: =HALFTONING_DISPLAY
+    *DefaultOption: HT_PAT_8x8_M
+    *Option: HT_PAT_8x8_M
+    {
+        *rcNameID: =HT_PATTERN_8X8_M_DISPLAY
+    }
+}
+
+*% Job Commands
+*Command: CmdStartJob
+{
+    *Order: JOB_SETUP.10
+    *Cmd: "<1B>%%-12345X@PJL JOB MODE=PRINTER<0A>"
+}
+
+*Command: CmdEndJob
+{
+    *Order: JOB_FINISH.10
+    *Cmd: "<1B>%%-12345X@PJL EOJ<0A><1B>%%-12345X"
+}
