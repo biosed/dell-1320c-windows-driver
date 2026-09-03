@@ -113,6 +113,26 @@ gswin64c.exe -q -dNOPAUSE -dBATCH -sDEVICE=ppmraw -r600 -sOutputFile=- document.
 | `--mono` | 8bpp High-speed Grayscale mode | Off |
 | `--dpi <res>` | Resolution: `600` or `300` DPI | `600` |
 
+Any option not passed on the command line falls back to the saved printing
+preferences (see below), if present.
+
+### 🖨️ Printing Preferences window
+
+`preferences/Printing-Preferences.ps1` is a settings window in the style of
+the official driver's Printing Preferences: paper size/source, resolution,
+color mode, and copies. Run it as Administrator (it writes the per-queue
+defaults file):
+
+```powershell
+.\preferences\Printing-Preferences.ps1
+```
+
+Choices are stored in `%ProgramData%\Dell1320\defaults.cfg` (`paper`, `tray`,
+`color`, `dpi`, `copies`, `user`, `title` as `key=value` lines). The port
+monitor invokes `dell1320c_winprint.exe` without flags, so these saved
+values become the queue defaults; any explicit CLI flag still wins.
+`Restore Defaults` resets to A4, tray 1, color, 600 dpi, 1 copy.
+
 ---
 
 ## 📁 Repository Structure

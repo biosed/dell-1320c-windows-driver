@@ -39,8 +39,87 @@
   #define ARCH_NAME "Universal Architecture"
 #endif
 
-static void print_usage(const char *prog) {
-    printf("Dell Color Laser 1320c Windows Print Engine\n");
+/* Per-queue defaults file (written by Printing-Preferences.ps1).
+ * Format is key=value lines: paper, tray, color, dpi, copies, user, title.
+ * Values here apply only to options NOT given on the command line. */
+static void winprint_config_path(char *out, size_t out_len) {
+    const char *env = getenv("DELL1320_DEFAULTS");
+    if (env && env[0]) {
+        strncpy(out, env, out_len - 1);
+        out[out_len - 1] = '\0';
+        return;
+    }
+#ifdef _WIN32
+    {
+        char base[480] = "";
+        DWORD n = GetEnvironmentVariableA("PROGRAMDATA", base, sizeof(base));
+        if (n > 0 && n < sizeof(base))
+            snprintf(out, out_len, "%s\\Dell1320\\defaults.cfg", base);
+        else
+            snprintf(out, out_len, "C:\\ProgramData\\Dell1320\\defaults.cfg");
+    }
+#else
+    snprintf(out, out_len, "/etc/dell1320c/defaults.cfg");
+#endif
+}
+
+static void apply_defaults_file(DellJobConfig *cfg, const char *path,
+                                int has_paper, int has_tray, int has_color,
+                                int has_dpi, int has_copies,
+                                int has_title, int has_user) {
+    FILE *fp = fopen(path, "r");
+    char line[256];
+    if (!fp)
+        return; /* no saved preferences: compiled defaults stand */
+    while (fgets(line, sizeof(line), fp)) {
+        char *eq = strchr(line, '=');
+        char *val;
+        if (!eq)
+            continue;
+        *eq = '\0';
+        val = eq + 1;
+        val[strcspn(val, "\r\n")] = '\0';
+        if (strcmp(line, "paper") == 0 && !has_paper) {
+            DellPaperCode code;
+            int w, h;
+            if (dell1320c_parse_paper(val, &code, &w, &h) == 0) {
+                cfg->paper = code;
+                cfg->width_pt = w;
+                cfg->height_pt = h;
+            }
+        } else if (strcmp(line, "tray") == 0 && !has_tray) {
+            if (strcmp(val, "1") == 0 || strcasecmp(val, "tray1") == 0)
+                cfg->tray = DELL1320C_TRAY_1;
+            else if (strcmp(val, "2") == 0 || strcasecmp(val, "tray2") == 0)
+                cfg->tray = DELL1320C_TRAY_2;
+            else if (strcasecmp(val, "bypass") == 0)
+                cfg->tray = DELL1320C_TRAY_BYPASS;
+            else if (strcasecmp(val, "auto") == 0)
+                cfg->tray = DELL1320C_TRAY_AUTO;
+        } else if (strcmp(line, "color") == 0 && !has_color) {
+            if (strcasecmp(val, "mono") == 0 || strcasecmp(val, "gray") == 0 ||
+                strcasecmp(val, "black") == 0)
+                cfg->color_mode = DELL1320C_MODE_MONO;
+            else if (strcasecmp(val, "color") == 0)
+                cfg->color_mode = DELL1320C_MODE_COLOR;
+        } else if (strcmp(line, "dpi") == 0 && !has_dpi) {
+            int d = atoi(val);
+            if (d == 300 || d == 600)
+                cfg->dpi = d;
+        } else if (strcmp(line, "copies") == 0 && !has_copies) {
+            int c = atoi(val);
+            if (c >= 1 && c <= 999)
+                cfg->copies = c;
+        } else if (strcmp(line, "title") == 0 && !has_title) {
+            strncpy(cfg->title, val, sizeof(cfg->title) - 1);
+        } else if (strcmp(line, "user") == 0 && !has_user) {
+            strncpy(cfg->user, val, sizeof(cfg->user) - 1);
+        }
+    }
+    fclose(fp);
+}
+
+static void print_usage(const char *prog) {    printf("Dell Color Laser 1320c Windows Print Engine\n");
     printf("Architecture: %s\n", ARCH_NAME);
     printf("Based on open-source driver biosed/dell-1320c-cups-driver\n\n");
     printf("Usage: %s [options]\n\n", prog);
@@ -61,7 +140,9 @@ static void print_usage(const char *prog) {
     printf("  --test-page       Generate and print built-in Dell 1320c calibration page\n");
     printf("  --pipe-mode       Spooler pipe mode (binary stdin to binary stdout)\n");
     printf("  --version         Display version and architecture info\n");
-    printf("  -h, --help        Show this help text\n");
+    printf("  -h, --help        Show this help text\n\n");
+    printf("Any option not given here falls back to the saved printing\n");
+    printf("preferences (Printing-Preferences dialog), if present.\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -75,6 +156,8 @@ int main(int argc, char *argv[]) {
     const char *usb_port = NULL;
     int generate_test = 0;
     int pipe_mode = 0;
+    int has_paper = 0, has_tray = 0, has_color = 0, has_dpi = 0;
+    int has_copies = 0, has_title = 0, has_user = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
@@ -100,6 +183,7 @@ int main(int argc, char *argv[]) {
                 cfg.paper = code;
                 cfg.width_pt = w;
                 cfg.height_pt = h;
+                has_paper = 1;
             }
         } else if (strcmp(argv[i], "--tray") == 0 && i + 1 < argc) {
             const char *t = argv[++i];
@@ -107,23 +191,40 @@ int main(int argc, char *argv[]) {
             else if (strcmp(t, "2") == 0 || strcasecmp(t, "tray2") == 0) cfg.tray = DELL1320C_TRAY_2;
             else if (strcasecmp(t, "bypass") == 0) cfg.tray = DELL1320C_TRAY_BYPASS;
             else if (strcasecmp(t, "auto") == 0) cfg.tray = DELL1320C_TRAY_AUTO;
+            has_tray = 1;
         } else if (strcmp(argv[i], "--color") == 0) {
             cfg.color_mode = DELL1320C_MODE_COLOR;
+            has_color = 1;
         } else if (strcmp(argv[i], "--mono") == 0) {
             cfg.color_mode = DELL1320C_MODE_MONO;
+            has_color = 1;
         } else if (strcmp(argv[i], "--dpi") == 0 && i + 1 < argc) {
             cfg.dpi = atoi(argv[++i]);
+            has_dpi = 1;
         } else if (strcmp(argv[i], "--copies") == 0 && i + 1 < argc) {
             cfg.copies = atoi(argv[++i]);
+            has_copies = 1;
         } else if (strcmp(argv[i], "--title") == 0 && i + 1 < argc) {
             strncpy(cfg.title, argv[++i], sizeof(cfg.title) - 1);
+            has_title = 1;
         } else if (strcmp(argv[i], "--user") == 0 && i + 1 < argc) {
             strncpy(cfg.user, argv[++i], sizeof(cfg.user) - 1);
+            has_user = 1;
         } else if (strcmp(argv[i], "--test-page") == 0) {
             generate_test = 1;
         } else if (strcmp(argv[i], "--pipe-mode") == 0) {
             pipe_mode = 1;
         }
+    }
+
+    /* Fill in anything the command line left out from the saved
+     * per-queue preferences (Printing-Preferences dialog). */
+    {
+        char cfg_path[512];
+        winprint_config_path(cfg_path, sizeof(cfg_path));
+        apply_defaults_file(&cfg, cfg_path,
+                            has_paper, has_tray, has_color, has_dpi,
+                            has_copies, has_title, has_user);
     }
 
     /* Test page mode */
